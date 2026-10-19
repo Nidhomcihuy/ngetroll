@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surprise!</title>
+    <!-- Menggunakan Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Tombol "Tidak" melayang bebas di seluruh layar */
+        #btn-tidak {
+            position: fixed;
+            transition: top 0.25s ease, left 0.25s ease;
+            touch-action: manipulation;
+        }
+        body {
+            /* Mencegah layar bisa di-scroll saat tombol kabur */
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-pink-100 flex items-center justify-center h-screen relative">
+
+    <!-- Tampilan Awal -->
+    <div id="container-utama" class="text-center z-10 px-4 w-full">
+        <h1 id="judul" class="inline-block text-5xl md:text-8xl font-extrabold text-gray-800 mb-16 leading-tight">Lidia jelek ngeselin</h1>
+
+        <div class="flex justify-center">
+            <button id="btn-iya" class="bg-green-500 hover:bg-green-600 text-white font-bold py-5 px-14 rounded-xl text-4xl md:text-5xl z-20 shadow-lg cursor-pointer">Iya ngeselin</button>
+        </div>
+    </div>
+
+    <!-- Tombol "Tidak" (fixed, posisinya diatur lewat JavaScript) -->
+    <button id="btn-tidak" class="bg-red-500 hover:bg-red-600 text-white font-bold py-5 px-14 rounded-xl text-4xl md:text-5xl z-20 shadow-lg cursor-pointer" style="left: 0; top: 0; visibility: hidden;">ngga ya</button>
+
+    <!-- Tampilan Setelah Menekan "Iya" -->
+    <div id="hasil" class="hidden fixed inset-0 bg-black flex-col items-center justify-center z-50">
+        <h1 class="text-white text-5xl md:text-7xl mb-8 font-extrabold text-center px-4">Tuh kan ngaku! 🤣</h1>
+        <img src="kucing_plenger.jpeg" alt="Gambar Muncul" class="max-w-[85%] max-h-[55%] object-contain rounded-lg shadow-2xl">
+        <audio id="audio-kejutan" src="kucingketawa.mp3"></audio>
+    </div>
+
+    <script>
+        const btnTidak = document.getElementById('btn-tidak');
+        const btnIya = document.getElementById('btn-iya');
+        const judul = document.getElementById('judul');
+        const containerUtama = document.getElementById('container-utama');
+        const hasil = document.getElementById('hasil');
+        const audio = document.getElementById('audio-kejutan');
+
+        const MARGIN = 16;
+
+        // Cek apakah dua kotak saling bertumpuk (pad = jarak aman tambahan)
+        const bertumpuk = (a, b, pad) =>
+            a.left < b.right + pad &&
+            a.right > b.left - pad &&
+            a.top < b.bottom + pad &&
+            a.bottom > b.top - pad;
+
+        const taruh = (x, y) => {
+            btnTidak.style.left = `${x}px`;
+            btnTidak.style.top = `${y}px`;
+        };
+
+        // Pindahkan tombol "Tidak" ke posisi acak yang tidak menimpa tombol "Iya" / judul
+        const kabur = () => {
+            const w = btnTidak.offsetWidth;
+            const h = btnTidak.offsetHeight;
+            const maxX = Math.max(MARGIN, window.innerWidth - w - MARGIN);
+            const maxY = Math.max(MARGIN, window.innerHeight - h - MARGIN);
+
+            const rIya = btnIya.getBoundingClientRect();
+            const rJudul = judul.getBoundingClientRect();
+            const sekarang = btnTidak.getBoundingClientRect();
+
+            for (let i = 0; i < 100; i++) {
+                const x = MARGIN + Math.random() * (maxX - MARGIN);
+                const y = MARGIN + Math.random() * (maxY - MARGIN);
+                const kotak = { left: x, top: y, right: x + w, bottom: y + h };
+
+                const jauhDariPosisiLama =
+                    Math.hypot(x - sekarang.left, y - sekarang.top) > 150;
+
+                if (!bertumpuk(kotak, rIya, 30) &&
+                    !bertumpuk(kotak, rJudul, 10) &&
+                    jauhDariPosisiLama) {
+                    taruh(x, y);
+                    return;
+                }
+            }
+
+            // Cadangan: pilih sudut layar yang paling jauh dari tombol "Iya"
+            const sudut = [
+                [MARGIN, MARGIN], [maxX, MARGIN],
+                [MARGIN, maxY], [maxX, maxY]
+            ];
+            let terbaik = sudut[0], jarakTerbaik = -1;
+            for (const [x, y] of sudut) {
+                const d = Math.hypot(x - rIya.left, y - rIya.top);
+                if (d > jarakTerbaik) { jarakTerbaik = d; terbaik = [x, y]; }
+            }
+            taruh(terbaik[0], terbaik[1]);
+        };
+
+        // Posisi awal: di sebelah kanan tombol "Iya" (atau di bawahnya jika layar sempit)
+        const posisiAwal = () => {
+            const rIya = btnIya.getBoundingClientRect();
+            const w = btnTidak.offsetWidth;
+            const h = btnTidak.offsetHeight;
+            const gap = 40;
+
+            let x = rIya.right + gap;
+            let y = rIya.top;
+
+            if (x + w > window.innerWidth - MARGIN) {
+                x = (window.innerWidth - w) / 2;
+                y = rIya.bottom + gap;
+            }
+            if (y + h > window.innerHeight - MARGIN) {
+                kabur();
+            } else {
+                taruh(x, y);
+            }
+            btnTidak.style.visibility = 'visible';
+        };
+
+        window.addEventListener('load', posisiAwal);
+        window.addEventListener('resize', posisiAwal);
+
+        // Kabur saat disorot mouse (PC/Laptop)
+        btnTidak.addEventListener('mouseenter', kabur);
+
+        // Kabur saat disentuh jari (HP/Mobile)
+        btnTidak.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            kabur();
+        }, { passive: false });
+
+        // Jaga-jaga kalau tetap terklik (misalnya lewat keyboard): tetap kabur, tidak pernah hilang
+        btnTidak.addEventListener('click', (e) => {
+            e.preventDefault();
+            kabur();
+        });
+
+        // Apa yang terjadi jika tombol "Iya" ditekan
+        btnIya.addEventListener('click', () => {
+            containerUtama.classList.add('hidden');
+            btnTidak.classList.add('hidden');
+            hasil.classList.remove('hidden');
+            hasil.classList.add('flex');
+            audio.play().catch(() => {});
+        });
+    </script>
+</body>
+</html>
